@@ -28,11 +28,17 @@
 #include <linux/seq_file.h>
 #include <linux/cdev.h>
 
-#include <asm/system.h>		/* cli(), *_flags */
+   #include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 3, 0)
+            #include <asm/switch_to.h>
+#else
+            #include <asm/system.h>//#include <asm/system.h>		/* cli(), *_flags */
+#endif
 #include <asm/uaccess.h>	/* copy_*_user */
-
+#include <linux/uaccess.h>
+//#include <asm-generic/uaccess.h>
 #include "scull.h"		/* local definitions */
-
+//#include <linux/tty.h>
 /*
  * Our parameters which can be set at load time.
  */
@@ -647,7 +653,7 @@ int scull_init_module(void)
 	for (i = 0; i < scull_nr_devs; i++) {
 		scull_devices[i].quantum = scull_quantum;
 		scull_devices[i].qset = scull_qset;
-		init_MUTEX(&scull_devices[i].sem);
+		sema_init(&scull_devices[i].sem,1);//init_MUTEX(&scull_devices[i].sem);
 		scull_setup_cdev(&scull_devices[i], i);
 	}
 

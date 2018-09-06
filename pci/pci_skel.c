@@ -1,4 +1,6 @@
-#include <linux/config.h>
+//#include <linux/config.h>//旧
+//#include <linux/autoconf.h>//新
+//autoconf.h也没有
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>

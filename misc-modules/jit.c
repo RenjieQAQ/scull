@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 
 #include <asm/hardirq.h>
+#include <linux/slab.h> //added new
 /*
  * This module is a silly one: it only embeds short code fragments
  * that show how time delays can be handled in the kernel.

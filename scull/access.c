@@ -25,10 +25,13 @@
 #include <linux/types.h>  /* size_t */
 #include <linux/fcntl.h>
 #include <linux/cdev.h>
-#include <linux/tty.h>
 #include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <asm/atomic.h>
 #include <linux/list.h>
+#include <linux/tty.h>
+
+//#include <tools/testing/selftests/rcutorture/formal/srcu-cbmc/src/locks.h>
 
 #include "scull.h"        /* local definitions */
 
@@ -96,23 +99,22 @@ struct file_operations scull_sngl_fops = {
 static struct scull_dev scull_u_device;
 static int scull_u_count;	/* initialized to 0 by default */
 static uid_t scull_u_owner;	/* initialized to 0 by default */
-static spinlock_t scull_u_lock = SPIN_LOCK_UNLOCKED;
-
+DEFINE_SPINLOCK(scull_u_lock);//static spinlock_t scull_u_lock ;//= SPIN_LOCK_UNLOCKED;
 static int scull_u_open(struct inode *inode, struct file *filp)
 {
 	struct scull_dev *dev = &scull_u_device; /* device information */
 
 	spin_lock(&scull_u_lock);
 	if (scull_u_count &&
-            (scull_u_owner != current_cred()->uid) &&  /* allow user */
-	    (scull_u_owner != current_cred()->euid) && /* allow whoever did su */
+            (scull_u_owner != current_cred()->uid.val) &&  /* allow user */
+	    (scull_u_owner != current_cred()->euid.val) && /* allow whoever did su */
 	    !capable(CAP_DAC_OVERRIDE)) { /* still allow root */
 		spin_unlock(&scull_u_lock);
 		return -EBUSY;   /* -EPERM would confuse the user */
 	}
 
 	if (scull_u_count == 0)
-		scull_u_owner = current_cred()->uid; /* grab it */
+		scull_u_owner = current_cred()->uid.val; /* grab it */
 
 	scull_u_count++;
 	spin_unlock(&scull_u_lock);
@@ -158,13 +160,13 @@ static struct scull_dev scull_w_device;
 static int scull_w_count;	/* initialized to 0 by default */
 static uid_t scull_w_owner;	/* initialized to 0 by default */
 static DECLARE_WAIT_QUEUE_HEAD(scull_w_wait);
-static spinlock_t scull_w_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(scull_w_lock);//static spinlock_t scull_w_lock ;//= SPIN_LOCK_UNLOCKED;
 
 static inline int scull_w_available(void)
 {
 	return scull_w_count == 0 ||
-		scull_w_owner == current_cred()->uid ||
-		scull_w_owner == current_cred()->euid ||
+		scull_w_owner == current_cred()->uid.val ||
+		scull_w_owner == current_cred()->euid.val ||
 		capable(CAP_DAC_OVERRIDE);
 }
 
@@ -182,7 +184,7 @@ static int scull_w_open(struct inode *inode, struct file *filp)
 		spin_lock(&scull_w_lock);
 	}
 	if (scull_w_count == 0)
-		scull_w_owner = current_cred()->uid; /* grab it */
+		scull_w_owner = current_cred()->uid.val; /* grab it */
 	scull_w_count++;
 	spin_unlock(&scull_w_lock);
 
@@ -238,7 +240,7 @@ struct scull_listitem {
 
 /* The list of devices, and a lock to protect it */
 static LIST_HEAD(scull_c_list);
-static spinlock_t scull_c_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(scull_c_lock);//static spinlock_t scull_c_lock;// = SPIN_LOCK_UNLOCKED;
 
 /* A placeholder scull_dev which really just holds the cdev stuff. */
 static struct scull_dev scull_c_device;   
@@ -262,8 +264,8 @@ static struct scull_dev *scull_c_lookfor_device(dev_t key)
 	memset(lptr, 0, sizeof(struct scull_listitem));
 	lptr->key = key;
 	scull_trim(&(lptr->device)); /* initialize it */
-	init_MUTEX(&(lptr->device.sem));
-
+	
+	sema_init(&(lptr->device.sem),1);//init_MUTEX(&(lptr->device.sem));
 	/* place it in the list */
 	list_add(&lptr->list, &scull_c_list);
 
@@ -348,7 +350,7 @@ static void scull_access_setup (dev_t devno, struct scull_adev_info *devinfo)
 	/* Initialize the device structure */
 	dev->quantum = scull_quantum;
 	dev->qset = scull_qset;
-	init_MUTEX(&dev->sem);
+	sema_init(&dev->sem,1);//init_MUTEX(&dev->sem);
 
 	/* Do the cdev stuff. */
 	cdev_init(&dev->cdev, devinfo->fops);
